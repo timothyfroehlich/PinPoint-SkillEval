@@ -62,7 +62,9 @@ export const getIssues = cache(
     // Type assertion needed because Drizzle infers status as string, not IssueStatus
     return (await db.query.issues.findMany({
       where: conditions.length > 0 ? and(...conditions) : undefined,
-      orderBy: desc(issues.createdAt),
+      // Optimization: If filtering by machine, sort by issueNumber to use the unique index (machineInitials, issueNumber).
+      // Otherwise fallback to createdAt (indexed globally).
+      orderBy: machineInitials ? desc(issues.issueNumber) : desc(issues.createdAt),
       with: {
         machine: {
           columns: {

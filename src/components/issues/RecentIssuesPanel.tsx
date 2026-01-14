@@ -57,7 +57,9 @@ export async function RecentIssuesPanel({
     // Type assertion needed because Drizzle infers status as string, not IssueStatus
     issues = (await db.query.issues.findMany({
       where: eq(issuesTable.machineInitials, machineInitials),
-      orderBy: [desc(issuesTable.createdAt)],
+      // Optimization: Sort by issueNumber instead of createdAt to leverage the existing unique index (machineInitials, issueNumber).
+      // Since issueNumber is sequential and assigned at creation, the order is identical to createdAt.
+      orderBy: [desc(issuesTable.issueNumber)],
       limit: limit,
       columns: {
         id: true,
