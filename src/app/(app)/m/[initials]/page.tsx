@@ -20,8 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ArrowLeft, Calendar, Plus } from "lucide-react";
-import { headers } from "next/headers";
-import { resolveRequestUrl } from "~/lib/url";
+import { getSiteUrl } from "~/lib/url";
 import { UpdateMachineForm } from "./update-machine-form";
 import { QrCodeDialog } from "./qr-code-dialog";
 import { buildMachineReportUrl } from "~/lib/machines/report-url";
@@ -114,9 +113,9 @@ export default async function MachineDetailPage({
   // Derive machine status
   const machineStatus = deriveMachineStatus(machine.issues as IssueForStatus[]);
 
-  // Generate QR data for modal using dynamic host resolution
-  const headersList = await headers();
-  const dynamicSiteUrl = resolveRequestUrl(headersList);
+  // Generate QR data for modal using canonical site URL
+  // Security: Use getSiteUrl() to prevent Host Header Injection
+  const dynamicSiteUrl = getSiteUrl();
 
   const reportUrl = buildMachineReportUrl({
     siteUrl: dynamicSiteUrl,
