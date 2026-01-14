@@ -76,13 +76,24 @@ export function PasswordStrength({
     <div className="space-y-2">
       {/* Strength bar */}
       <div className="flex items-center gap-2">
-        <div className="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden">
+        <div
+          className="flex-1 h-2 bg-surface-variant rounded-full overflow-hidden"
+          role="meter"
+          aria-valuenow={strength.score}
+          aria-valuemin={0}
+          aria-valuemax={4}
+          aria-valuetext={label}
+          aria-label="Password strength"
+        >
           <div
             className={cn("h-full transition-all duration-300", color)}
             style={{ width: `${widthPercentage}%` }}
           />
         </div>
-        <span className="text-xs font-medium text-on-surface-variant min-w-16">
+        <span
+          className="text-xs font-medium text-on-surface-variant min-w-16"
+          aria-hidden="true"
+        >
           {label}
         </span>
       </div>
