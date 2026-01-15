@@ -9,14 +9,19 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse } from "next/server";
 import { type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
-import { isInternalUrl } from "~/lib/url";
+import { getSiteUrl, isInternalUrl } from "~/lib/url";
 
-export function resolveRedirectPath(options: {
-  nextParam: string | null;
-  origin: string;
-  forwardedHost: string | null;
-}): string {
-  const { nextParam, origin, forwardedHost } = options;
+/**
+ * Resolves the safe redirect path.
+ *
+ * @param nextParam - The URL or path to redirect to.
+ * @param allowedHosts - List of allowed hosts for absolute URLs.
+ * @returns A safe internal path (e.g. "/dashboard") or "/" if invalid.
+ */
+export function resolveRedirectPath(
+  nextParam: string | null,
+  allowedHosts: string[]
+): string {
   const fallback = "/";
 
   if (!nextParam) {
@@ -27,16 +32,13 @@ export function resolveRedirectPath(options: {
     return nextParam;
   }
 
-  // Allow absolute URLs that point to this host only; drop origin to prevent open redirects.
   try {
-    const originHost = new URL(origin).host;
-    const allowedHosts = new Set([originHost]);
-    if (forwardedHost) {
-      allowedHosts.add(forwardedHost);
-    }
+    // Parse the URL. We use a dummy base because nextParam might be absolute or relative.
+    // If it's absolute, the base is ignored.
+    const parsed = new URL(nextParam, "http://localhost");
 
-    const parsed = new URL(nextParam, origin);
-    if (allowedHosts.has(parsed.host)) {
+    // Only allow absolute URLs if their host is in the allowedHosts list
+    if (allowedHosts.includes(parsed.host)) {
       const normalizedPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
       if (isInternalUrl(normalizedPath)) {
         return normalizedPath;
@@ -63,30 +65,30 @@ export function resolveRedirectPath(options: {
  * @see https://supabase.com/docs/guides/auth/server-side/nextjs
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const tokenHash = searchParams.get("token_hash");
   const typeParam = searchParams.get("type");
   const nextParam = searchParams.get("next") ?? "/";
 
-  const forwardedHost = request.headers.get("x-forwarded-host");
-  const next = resolveRedirectPath({ nextParam, origin, forwardedHost });
-  const isLocalEnv = process.env.NODE_ENV === "development";
+  // Security: Use the canonical site URL for redirects
+  const siteUrl = getSiteUrl();
+  const siteHost = new URL(siteUrl).host;
+
+  // Only allow redirects to the canonical site host
+  const allowedHosts = [siteHost];
+
+  const next = resolveRedirectPath(nextParam, allowedHosts);
+
   const shouldUseLoadingScreen = next === "/reset-password";
   const redirectPath = shouldUseLoadingScreen
     ? `/auth/loading?next=${encodeURIComponent(next)}`
     : next;
 
   const redirectToTarget = (): NextResponse => {
-    if (isLocalEnv) {
-      return NextResponse.redirect(`${origin}${redirectPath}`);
-    }
-
-    if (forwardedHost) {
-      return NextResponse.redirect(`https://${forwardedHost}${redirectPath}`);
-    }
-
-    return NextResponse.redirect(`${origin}${redirectPath}`);
+    // Always redirect using the canonical siteUrl
+    // This prevents Host Header Injection via X-Forwarded-Host
+    return NextResponse.redirect(`${siteUrl}${redirectPath}`);
   };
 
   const supabaseClient = createSupabaseClient(request);
@@ -129,7 +131,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Auth failed or no code - redirect to error page
   return applyCookies(
-    NextResponse.redirect(`${origin}/auth/auth-code-error`),
+    NextResponse.redirect(`${siteUrl}/auth/auth-code-error`),
     pendingCookies
   );
 }

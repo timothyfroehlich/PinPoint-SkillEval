@@ -25,75 +25,45 @@ describe("isInternalUrl", () => {
 });
 
 describe("resolveRedirectPath", () => {
+  const allowedHosts = ["localhost:3000", "app.example.com"];
+
   it("should accept valid internal path", () => {
-    const result = resolveRedirectPath({
-      nextParam: "/dashboard",
-      origin: "http://localhost:3000",
-      forwardedHost: null,
-    });
+    const result = resolveRedirectPath("/dashboard", allowedHosts);
     expect(result).toBe("/dashboard");
   });
 
   it("should reject external URL (open redirect prevention)", () => {
-    const result = resolveRedirectPath({
-      nextParam: "https://evil.com/steal-session",
-      origin: "http://localhost:3000",
-      forwardedHost: null,
-    });
+    const result = resolveRedirectPath("https://evil.com/steal-session", allowedHosts);
     expect(result).toBe("/");
   });
 
   it("should reject protocol-relative URL", () => {
-    const result = resolveRedirectPath({
-      nextParam: "//evil.com/phishing",
-      origin: "http://localhost:3000",
-      forwardedHost: null,
-    });
+    const result = resolveRedirectPath("//evil.com/phishing", allowedHosts);
     expect(result).toBe("/");
   });
 
   it("should handle paths with query params and hash", () => {
-    const result = resolveRedirectPath({
-      nextParam: "/dashboard?tab=issues#top",
-      origin: "http://localhost:3000",
-      forwardedHost: null,
-    });
+    const result = resolveRedirectPath("/dashboard?tab=issues#top", allowedHosts);
     expect(result).toBe("/dashboard?tab=issues#top");
   });
 
   it("should return fallback when nextParam is null", () => {
-    const result = resolveRedirectPath({
-      nextParam: null,
-      origin: "http://localhost:3000",
-      forwardedHost: null,
-    });
+    const result = resolveRedirectPath(null, allowedHosts);
     expect(result).toBe("/");
   });
 
-  it("should accept absolute URL matching origin host", () => {
-    const result = resolveRedirectPath({
-      nextParam: "http://localhost:3000/dashboard",
-      origin: "http://localhost:3000",
-      forwardedHost: null,
-    });
+  it("should accept absolute URL matching allowed host", () => {
+    const result = resolveRedirectPath("http://localhost:3000/dashboard", allowedHosts);
     expect(result).toBe("/dashboard");
   });
 
-  it("should accept absolute URL matching forwarded host", () => {
-    const result = resolveRedirectPath({
-      nextParam: "https://app.example.com/dashboard",
-      origin: "http://localhost:3000",
-      forwardedHost: "app.example.com",
-    });
+  it("should accept absolute URL matching another allowed host", () => {
+    const result = resolveRedirectPath("https://app.example.com/dashboard", allowedHosts);
     expect(result).toBe("/dashboard");
   });
 
-  it("should reject absolute URL not matching origin or forwarded host", () => {
-    const result = resolveRedirectPath({
-      nextParam: "https://evil.com/dashboard",
-      origin: "http://test.local",
-      forwardedHost: "app.example.com",
-    });
+  it("should reject absolute URL not matching allowed hosts", () => {
+    const result = resolveRedirectPath("https://evil.com/dashboard", allowedHosts);
     expect(result).toBe("/");
   });
 });
