@@ -207,11 +207,9 @@ export async function submitPublicIssueAction(
       throw error;
     }
     log.error({ error }, "Failed to submit issue");
+    // Security: Return generic error to avoid leaking internal details
     return {
-      error:
-        error instanceof Error
-          ? error.message
-          : "Unable to submit the issue. Please try again.",
+      error: "Unable to submit the issue. Please try again.",
     };
   }
 }
