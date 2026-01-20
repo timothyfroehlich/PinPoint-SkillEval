@@ -4,6 +4,7 @@ import type React from "react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "~/components/ui/button";
+import { Checkbox } from "~/components/ui/checkbox";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { loginAction, type LoginResult } from "~/app/(auth)/actions";
@@ -86,13 +87,7 @@ export function LoginForm({
 
         {/* Remember Me */}
         <div className="flex items-center space-x-2">
-          <input
-            id="rememberMe"
-            name="rememberMe"
-            type="checkbox"
-            className="size-4 rounded border-border text-primary focus:ring-2 focus:ring-ring bg-input"
-            defaultChecked
-          />
+          <Checkbox id="rememberMe" name="rememberMe" defaultChecked />
           <Label
             htmlFor="rememberMe"
             className="text-sm font-normal cursor-pointer"
