@@ -23,3 +23,9 @@
 **Vulnerability:** Admin invitation emails were constructing links using `headers().get("host")`. This allows attackers to spoof the Host header and generate password reset or invite links pointing to malicious domains.
 **Learning:** Never trust the `Host` header for constructing absolute URLs, especially for security-critical flows like authentication or invitations.
 **Prevention:** Use a configured, static site URL (via `NEXT_PUBLIC_SITE_URL`) enforced by utilities like `requireSiteUrl()` to generate absolute links.
+
+## 2025-02-18 - Host Header Injection in QR Codes
+
+**Vulnerability:** Machine detail pages generated QR codes using `resolveRequestUrl` which relied on the `Host` header.
+**Learning:** Utilities that resolve URLs dynamically from request headers can introduce Host Header Injection if used for persistent or shareable links (like QR codes).
+**Prevention:** Use `getSiteUrl()` to enforce the canonical site URL for any generated links that leave the immediate request context.
