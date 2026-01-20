@@ -1,121 +1,158 @@
+```skill
 ---
 name: Jules PR Manager
 description: Manage Google Jules PR lifecycle - batch investigation, reverse-order processing, and tiered decision presentation.
-version: 2.7.0
+version: 3.1.0
 ---
 
 # Jules PR Manager
 
-## Overview
+## Core Principle
 
-**Manage the lifecycle of PRs created by Google's Jules agent (Gemini 2.5 Pro).**
+**YOU ARE AN ADVISOR. THE USER MAKES ALL DECISIONS.**
 
-This skill orchestrates a **Batch-Analyze-Present-Execute** loop. It strictly prioritizes **finishing work** (merging) before **starting work** (vetting).
+Your role:
+1. Gather information using the scripts
+2. Analyze and summarize findings
+3. Present options with your recommendations
+4. **WAIT for explicit user approval before ANY action**
 
-⚠️ **MANDATORY**: You MUST use the bash scripts in `.gemini/skills/jules-pr-manager/` for ALL interactions. Do not assemble `gh` commands manually.
-
-## State Machine (The Workflow)
-
-Process PRs in this order (closest to completion first):
-
-### 1. Merge Candidates (The Exit)
-
-- **Definition**: PRs vetted, Copilot Approved, CI Passed, No Conflicts.
-- **MANDATORY**: Before running merge, you MUST present a detailed summary of the PR to the User and wait for explicit confirmation.
-- **Action**: Run `./merge.sh <ID> ["message"]`.
-
-### 2. Copilot Review (`jules:copilot-review`)
-
-- **Condition: Copilot left comments**:
-  - Run `./request-changes.sh <ID> "Refined Copilot comments..."`.
-  - Run `./label.sh <ID> remove jules:copilot-review`.
-  - Run `./label.sh <ID> add jules:changes-requested`.
-- **Condition: CI Failed**:
-  - Run `./request-changes.sh <ID> "Fix CI failures: <details>"`.
-  - Run `./label.sh <ID> remove jules:copilot-review`.
-  - Run `./label.sh <ID> add jules:changes-requested`.
-- **Condition: Approved**: Move to Merge Candidate.
-
-### 3. Transition to Copilot Review (CRITICAL STEP)
-
-- **Condition**: `jules:vetted` AND CI Passed AND NOT `jules:copilot-review`.
-- **MANDATORY ACTION**:
-  1. Run `./mark-ready.sh <ID>`. **(This converts Draft to PR; Copilot will ignore Drafts.)**
-  2. Run `./label.sh <ID> add jules:copilot-review`.
-- **Why**: This is the primary trigger for the automated audit pipeline. If you skip `mark-ready.sh`, the PR will stall indefinitely in the Copilot queue.
-
-### 4. Changes Requested (`jules:changes-requested`)
-
-- **Condition: Jules Responded (New commits/comments)**:
-  - If fixes are good -> Move to "Transition to Copilot Review".
-  - If fixes are bad -> Run `./request-changes.sh <ID> "Still needs work: <details>"`.
-- **Condition: Stalled (>30m silence)**:
-  - Run `./request-changes.sh <ID> "Ping @jules - status update?"`.
-
-### 5. New PRs (Unvetted)
-
-- **Action 1: Duplicate Detection**:
-  - Run `./diff.sh <ID1> <ID2>` to compare.
-  - Pick the best implementation (the "Keeper").
-  - Run `./request-changes.sh <Keeper_ID> "Incorporate good parts from #<Loser_ID>..."`.
-  - Run `./close.sh <Loser_ID> "Duplicate of #<Keeper_ID>"`.
-- **Action 2: Vetting**:
-  - Review code. If worth doing:
-    - Run `./label.sh <ID> add jules:vetted`.
-    - If CI is already passing, move to "Transition to Copilot Review".
-  - If NOT worth doing:
-    - Run `./close.sh <ID> "Rationale for rejection"`.
+You do NOT:
+- Merge, close, or modify PRs without user saying "yes"
+- Assume silence means approval
+- Batch multiple decisions into one approval
+- Take any destructive action autonomously
 
 ---
 
-## Execution Model
+## Quick Reference
 
-### 1. Batch Investigation
+| Script | Purpose |
+|:-------|:--------|
+| `./summary.sh` | Overview of ALL open PRs (run first) |
+| `./detail.sh <id>` | Deep dive on single PR |
+| `./diff.sh <id1> [id2]` | Compare PRs for duplicates |
+| `./merge.sh <id> [msg]` | Merge (USER APPROVAL REQUIRED) |
+| `./close.sh <id> [msg]` | Close PR (USER APPROVAL REQUIRED) |
+| `./request-changes.sh <id> <msg>` | Request fixes from Jules |
+| `./mark-ready.sh <id>` | Convert Draft → PR |
+| `./label.sh <id> <add\|remove> <label>` | Manage labels |
 
-- Run `./investigate.sh` to get a consolidated JSON (check `lastInstructionAcknowledged` field to confirm Jules has read feedback). of all Jules PRs and their filtered activity timelines.
-- Log the status and plan for every PR before presenting.
-
-### 2. Decision Collection
-
-- Group actions into: **Merge Decisions**, **Vetting Decisions**, and **Trivial Batch** (label changes, automated request-changes).
-
-### 3. Tiered Presentation
-
-Present decisions to the User in this EXACT order:
-
-1. **Merge Decisions**: One by one. You MUST provide a detailed summary of each PR (logic changes, impact, vetting results) and request explicit confirmation before merging.
-2. **Vetting Requests**: One by one (include deep opinion on rationale/impact).
-3. **Trivial Batch**: As a numbered list for bulk approval.
-
-### 4. Batch Execution
-
-- Execute all approved actions in one turn. Use `&` to run script calls in the background where appropriate to improve performance.
+⚠️ Use scripts in `.gemini/skills/jules-pr-manager/`. Do not assemble `gh` commands manually.
 
 ---
 
-## Automation Scripts Reference
+## Workflow
 
-| Script                                  | Purpose                                | Review Type       | Tags @jules |
-| :-------------------------------------- | :------------------------------------- | :---------------- | :---------- |
-| `./investigate.sh`                      | One-shot fetch of all PRs + timelines. | N/A               | No          |
-| `./view-pr.sh <id>`                     | Full unfiltered JSON for one PR.       | N/A               | No          |
-| `./diff.sh <id1> [id2]`                 | View diff or compare two PRs.          | N/A               | No          |
-| `./request-changes.sh <id> <msg>`       | Demand work/fixes or nudge.            | `REQUEST_CHANGES` | **Yes**     |
-| `./merge.sh <id> [msg]`                 | Finalize and merge.                    | `APPROVE`         | **Yes**     |
-| `./close.sh <id> [msg]`                 | Close the PR.                          | N/A               | No          |
-| `./mark-ready.sh <id>`                  | Trigger Copilot (gh pr ready).         | N/A               | No          |
-| `./label.sh <id> <add\|remove> <label>` | Manage state labels.                   | N/A               | No          |
+### Step 1: Gather Data
+
+Run `./summary.sh` and categorize PRs:
+
+| Condition | Category |
+|:----------|:---------|
+| No labels | Unvetted (needs review) |
+| `jules:copilot-review` + Copilot APPROVED + CI SUCCESS | Merge candidate |
+| `jules:copilot-review` + Copilot commented | Needs feedback relay |
+| `jules:copilot-review` + CI FAILURE | Needs CI fix |
+| `jules:changes-requested` | Waiting on Jules |
+| `mergeable: CONFLICTING` | Has conflicts |
+
+**Duplicate Detection**: PRs with overlapping `files` arrays are likely duplicates.
+
+### Step 2: Present Findings to User
+
+Summarize what you found:
+- How many PRs total, how many are Jules PRs
+- Which are merge candidates
+- Which appear to be duplicates (list the clusters)
+- Which need attention (CI failures, stalled, conflicts)
+
+### Step 3: Process One Decision at a Time
+
+For each PR requiring action, present:
+
+1. **The PR**: Number, title, what it does
+2. **Your Analysis**: Is it a duplicate? Worth merging? Any concerns?
+3. **Your Recommendation**: What you suggest and why
+4. **Options**: Clear choices for the user
+
+Example presentation:
+```
+**#796: Add indexes for issue severity and priority**
+
+Analysis: This adds DB indexes for faster filtering. Appears to be
+a duplicate of #794 (same files modified). #796 is newer.
+
+Recommendation: Close #794 as duplicate, keep #796.
+
+Options:
+A) Close #794, keep #796 (recommended)
+B) Close #796, keep #794
+C) Keep both (explain why)
+D) Close both
+E) Need more info (I'll run detail.sh)
+```
+
+**WAIT FOR USER RESPONSE BEFORE PROCEEDING.**
+
+### Step 4: Execute Approved Actions
+
+Only after user explicitly approves:
+- Run the appropriate script(s)
+- Report the result
+- Move to the next decision
 
 ---
 
-## GitHub Labels Reference
+## Labels
 
-- `jules:vetted`: Approved for processing.
-- `jules:copilot-review`: Waiting for Copilot.
-- `jules:changes-requested`: Waiting for Jules (Fixes/Comments).
-- `jules:agent-stalled`: >30m silence.
-- `jules:merge-conflicts`: Git conflict.
+| Label | Meaning |
+|:------|:--------|
+| `jules:copilot-review` | Vetted, waiting for Copilot |
+| `jules:changes-requested` | Waiting for Jules fixes |
+| `jules:agent-stalled` | >30m silence from Jules |
+| `jules:merge-conflicts` | Has git conflicts |
 
-## Agent Search Optimization (ASO)
+No label = unvetted.
 
-**Keywords**: jules, pr manager, scripts, automation, batch, merge, vetting, duplicates, tiered presentation
+---
+
+## Decision Types
+
+### Duplicates
+- Compare `files` arrays in summary output
+- Use `./diff.sh <id1> <id2>` to confirm
+- Present both PRs, recommend which to keep
+- **User decides** which is the "keeper"
+
+### Vetting (New PRs)
+- Use `./detail.sh <id>` for full context
+- Assess: Is this change valuable? Any risks?
+- **User decides** approve or reject
+
+### Merging
+- Only for: vetted + Copilot approved + CI passing
+- Present full summary of changes
+- **User decides** to merge or not
+
+### Closing
+- For duplicates or rejected PRs
+- Explain why you recommend closing
+- **User decides** to close or not
+
+---
+
+## Jules Detection
+
+Jules PRs have `author: "google-labs-jules[bot]"` in summary output.
+
+---
+
+## Remember
+
+- Present information, don't take action
+- One decision at a time
+- Wait for explicit approval
+- "What would you like to do?" not "I will do X"
+
+```
