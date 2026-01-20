@@ -108,5 +108,11 @@
 
   // Extension Performance Management
   "extensions.autoUpdate": false,
-  "extensions.autoCheckUpdates": false
+  "extensions.autoCheckUpdates": false,
+  "chat.tools.terminal.autoApprove": {
+    "/^bash \\./\\.github/skills/jules-pr-manager/investigate\\.sh$/": {
+      "approve": true,
+      "matchCommandLine": true
+    }
+  }
 }
