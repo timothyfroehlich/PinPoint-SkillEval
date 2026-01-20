@@ -182,7 +182,12 @@ export const issues = pgTable(
     ),
     assignedToIdx: index("idx_issues_assigned_to").on(t.assignedTo),
     reportedByIdx: index("idx_issues_reported_by").on(t.reportedBy),
-    statusIdx: index("idx_issues_status").on(t.status),
+    // Composite index for dashboard performance (status filtering + severity check + machine distinct count)
+    dashboardLookupIdx: index("idx_issues_dashboard_lookup").on(
+      t.status,
+      t.severity,
+      t.machineInitials
+    ),
     createdAtIdx: index("idx_issues_created_at").on(t.createdAt),
     invitedReportedByIdx: index("idx_issues_invited_reported_by").on(
       t.invitedReportedBy
