@@ -23,3 +23,8 @@
 **Vulnerability:** Admin invitation emails were constructing links using `headers().get("host")`. This allows attackers to spoof the Host header and generate password reset or invite links pointing to malicious domains.
 **Learning:** Never trust the `Host` header for constructing absolute URLs, especially for security-critical flows like authentication or invitations.
 **Prevention:** Use a configured, static site URL (via `NEXT_PUBLIC_SITE_URL`) enforced by utilities like `requireSiteUrl()` to generate absolute links.
+
+## 2025-05-24 - Host Header Injection in Auth Callback
+**Vulnerability:** The auth callback route used `X-Forwarded-Host` to construct the redirect URL, allowing Open Redirect attacks if the header was spoofed.
+**Learning:** Trusting `X-Forwarded-Host` or `Host` headers for redirects is dangerous without validation against a canonical site URL.
+**Prevention:** Always use `getSiteUrl()` (which prioritizes `NEXT_PUBLIC_SITE_URL`) as the base for redirects.
