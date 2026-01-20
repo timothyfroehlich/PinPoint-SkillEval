@@ -1,6 +1,5 @@
-```skill
 ---
-name: Jules PR Manager
+name: jules-pr-manager
 description: Manage Google Jules PR lifecycle - batch investigation, reverse-order processing, and tiered decision presentation.
 version: 3.1.0
 ---
